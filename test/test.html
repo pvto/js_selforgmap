@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="../lib/react.js"></script>
+<script src="../lib/JSXTransformer.js"></script>
+<script src="../lib/d3.v3.js" charset="utf-8" type="text/javascript"></script>
+<script src="../lib/lodash.js" charset="utf-8" type="text/javascript"></script>
+<script src="../src/js/js_selforgmap.js" charset="utf-8" type="text/javascript"></script>
+</head>
+<body>
+  <table>
+  <tbody>
+  <tr>
+  <td>
+    <svg
+        version="1.1"
+        width="600"
+        height="600">
+        <g id="layer1" transform="matrix(600,0,0,600, 0,0)">
+            <rect width="1" height="1" style="fill:#353535;" />
+            <g id="content">
+                <g class="bbb" transform="translate(0.32,0)">
+                </g>
+            </g>
+        </g>
+    </svg>
+  </td>
+  <td>
+    <script type="text/javascript">
+        var kohonen = function(lattice, params, data, S, success) {
+
+            var timedRunner = function() {
+                var g = d3.selectAll("#content");
+                var dmax = _.max(_.flatten(lattice));
+                g.selectAll("g").remove();
+                var w = 1 / lattice[0].length,
+                    h = 1 / lattice.length,
+                    j, i, d
+                    ;
+                for(j = 0; j < lattice.length; j++) {
+                    for(i = 0; i < lattice[0].length; i++) {
+                        d = Math.floor(lattice[j][i] / dmax * 255);
+                        var g2 = g.append("g").attr("id", "lat"+i+"-"+j);
+                        g2.attr("transform", "translate("+(i*w)+","+(j*h)+")");
+                        g2.append("rect").attr("width", w).attr("height", h)
+                            .attr("style", "stroke-width:0.001;stroke:#ffffff;")
+                            .style("fill", d3.rgb(0,0,d))
+                            ;
+                    }
+                }
+                for(var i = 0; i < data.length; i++) {
+                    var jd = S.bestmatch(data, i, lattice, params.weights, false);
+                    var u = jd % lattice[0].length,
+                        v = Math.floor(jd / lattice[0].length)
+                        ;
+                    var g = d3.select("#lat"+u+"-"+v);
+                    var fontsize = 0.02,
+                        rnd = Math.floor(Math.random() * 100),
+                        prime = 32453723;
+                    g.append("text")
+                        .attr("x", ( ( (i + rnd) * 32453723 + 17 ) / lattice.length % lattice[0].length) / lattice[0].length * w * 0.8 + w * 0.05)
+                        .attr("y", ( ( (i + rnd) * 32453723 + 17 ) % lattice[0].length) / lattice[0].length * h * 0.8 + fontsize)
+                        .style("font-size", fontsize)
+                        .style("fill", "#ffffff")
+                        .text(i);
+                }
+                if (params.neighborhood > 0.1) {
+                    window.setTimeout(timedRunner, 10);
+                }
+            };
+
+            window.setTimeout(timedRunner, 100);
+
+            S.learn(data, lattice, params, success);
+        };
+        window.kohonen = kohonen;
+    </script>
+
+
+    <div id="controls" />
+    <script type="text/jsx">
+        var SelforgmapControls = React.createClass({
+            getInitialState: function() {
+                return {
+                    latticeSize: 6,
+                    neighborhood: 6,
+                    mu: 0.950,
+                    deltamu: 0.003,
+                    data: [
+                        [0,0,5],
+                        [1,1,4],
+                        [2,2,3],
+                        [3,3,2],
+                        [4,4,1],
+                        [5,5,0]
+                    ],
+                    running: "Stopped"
+                };
+            },
+            handleChange: function() {
+                this.setState({
+                    latticeSize: this.refs.latticeSize.getDOMNode().value,
+                    neighborhood: this.refs.neighborhood.getDOMNode().value,
+                    mu: this.refs.mu.getDOMNode().value,
+                    deltamu: this.refs.deltamu.getDOMNode().value
+                });
+            },
+            testKohonen: function() {
+                var S = sorgmap2;
+                var latticeSize = +this.state.latticeSize || 6;
+                var lattice = S.createLattice(latticeSize, latticeSize);
+                var params = {
+                    mu: this.state.mu || 0.950,
+                    deltamu: this.state.deltamu || 0.001,
+                    neighborhood: this.state.neighborhood || latticeSize
+                };
+                var me = this;
+                var callback = function() {
+                    me.setState({running: "Stopped"});
+                };
+                window.kohonen(lattice, params, this.state.data, S, callback);
+            },
+            handleSubmit: function(e) {
+                e.preventDefault();
+                if (this.state.running == "Running") {
+                    return;
+                }
+                this.setState({running: "Running"});
+                this.testKohonen();
+            },
+            render: function() {
+                return (
+                    <div className="SelforgmapControls">
+                        <h2>Kohonen Self organizing map</h2>
+                        <p>State:  <span>{this.state.running}</span></p>
+                        <h3>Controls</h3>
+                        <table>
+                        <tbody>
+                        <tr>
+                        <td>Lattice Size</td>
+                        <td><input
+                            type="text"
+                            onChange={this.handleChange}
+                            ref="latticeSize"
+                            defaultValue={this.state.latticeSize} /></td>
+                        </tr>
+                        <tr>
+                        <td>Neighborhood</td>
+                        <td><input
+                            type="text"
+                            onChange={this.handleChange}
+                            ref="neighborhood"
+                            defaultValue={this.state.neighborhood} /></td>
+                        </tr>
+                        <tr>
+                        <td>Mu</td>
+                        <td><input
+                            type="text"
+                            onChange={this.handleChange}
+                            ref="mu"
+                            defaultValue={this.state.mu} /></td>
+                        </tr>
+                        <tr>
+                        <td>Delta mu</td>
+                        <td><input
+                            type="text"
+                            onChange={this.handleChange}
+                            ref="deltamu"
+                            defaultValue={this.state.deltamu} /></td>
+                        </tr>
+                        <tr>
+                        <td>
+                            <form onSubmit={this.handleSubmit}>
+                                <button>Run</button>
+                            </form>
+                        </td>
+                        </tr>
+                        </tbody>
+                        </table>
+                    </div>
+                );
+            }
+        });
+
+        React.render(<SelforgmapControls/>, document.getElementById('controls'));
+    </script>
+  </td>
+</tr>
+</tbody>
+</table>
+
+    <script type="text/javascript">
+
+    </script>
+</body>
+</html>
